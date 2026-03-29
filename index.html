@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTML Link Automation</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .container { background: white; border-radius: 12px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); max-width: 700px; width: 100%; padding: 40px; }
+        h1 { font-size: 28px; margin-bottom: 10px; color: #1a1a1a; }
+        .subtitle { color: #666; margin-bottom: 30px; font-size: 14px; }
+        .section { margin-bottom: 30px; }
+        .section h2 { font-size: 16px; font-weight: 600; margin-bottom: 12px; color: #1a1a1a; }
+        textarea { width: 100%; min-height: 200px; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace; font-size: 13px; resize: vertical; line-height: 1.5; }
+        textarea:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); }
+        .options { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+        .option { padding: 16px; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; text-align: center; font-size: 14px; transition: all 0.2s; background: white; }
+        .option:hover { border-color: #667eea; background: #f8f9ff; }
+        .option.active { border-color: #667eea; background: #667eea; color: white; font-weight: 600; }
+        .option-icon { font-size: 24px; margin-bottom: 8px; }
+        .button-group { display: flex; gap: 12px; margin-bottom: 20px; }
+        button { flex: 1; padding: 12px 24px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-primary:hover { background: #5568d3; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3); }
+        .btn-secondary { background: #f0f0f0; color: #1a1a1a; }
+        .btn-secondary:hover { background: #e0e0e0; }
+        .status { font-size: 13px; margin: 12px 0; min-height: 20px; }
+        .status.success { color: #10b981; }
+        .status.error { color: #ef4444; }
+        .result-box { background: #f8f9ff; border: 1px solid #ddd; border-radius: 8px; padding: 16px; font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace; font-size: 12px; word-break: break-all; display: none; margin-top: 20px; }
+        .result-box.show { display: block; }
+        .link-preview { background: white; padding: 12px; border-radius: 6px; margin-bottom: 12px; border: 1px solid #667eea; color: #667eea; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .copy-btn { width: 100%; padding: 10px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.2s; }
+        .copy-btn:hover { background: #5568d3; }
+        @media (max-width: 600px) { .container { padding: 24px; } h1 { font-size: 22px; } .options { grid-template-columns: 1fr; } .button-group { flex-direction: column; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>✨ HTML Link Automation</h1>
+        <p class="subtitle">Paste your HTML → Get a shareable link instantly</p>
+
+        <div class="section">
+            <h2>Paste your HTML</h2>
+            <textarea id="htmlInput" placeholder="Paste your HTML code here..."></textarea>
+        </div>
+
+        <div class="section">
+            <h2>Choose link type</h2>
+            <div class="options">
+                <div class="option active" onclick="selectType(this, 'public')">
+                    <div class="option-icon">🌍</div>
+                    <strong>Public</strong>
+                </div>
+                <div class="option" onclick="selectType(this, 'temporary')">
+                    <div class="option-icon">⏱️</div>
+                    <strong>Temporary</strong>
+                </div>
+                <div class="option" onclick="selectType(this, 'private')">
+                    <div class="option-icon">🔒</div>
+                    <strong>Private</strong>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="button-group">
+                <button class="btn-primary" onclick="generateLink()">✨ Generate Link</button>
+                <button class="btn-secondary" onclick="previewHTML()">👁️ Preview</button>
+            </div>
+            <div class="status" id="status"></div>
+        </div>
+
+        <div class="result-box" id="resultBox">
+            <div class="link-preview" id="linkText"></div>
+            <button class="copy-btn" onclick="copyToClipboard()">📋 Copy Link</button>
+        </div>
+    </div>
+
+    <script>
+        let selectedType = 'public';
+        let currentLink = '';
+
+        function selectType(element, type) {
+            document.querySelectorAll('.option').forEach(opt => opt.classList.remove('active'));
+            element.classList.add('active');
+            selectedType = type;
+        }
+
+        function generateLink() {
+            const htmlContent = document.getElementById('htmlInput').value.trim();
+            if (!htmlContent) {
+                showStatus('❌ Please paste some HTML first', 'error');
+                return;
+            }
+            const hash = Math.random().toString(36).substring(2, 12).toUpperCase();
+            const baseUrl = window.location.origin;
+            let link = `${baseUrl}/view/${hash}`;
+            currentLink = link;
+            document.getElementById('linkText').textContent = link;
+            document.getElementById('resultBox').classList.add('show');
+            showStatus('✅ Link generated!', 'success');
+            localStorage.setItem(hash, htmlContent);
+        }
+
+        function copyToClipboard() {
+            navigator.clipboard.writeText(currentLink).then(() => {
+                const btn = event.target;
+                btn.textContent = '✅ Copied!';
+                setTimeout(() => { btn.textContent = '📋 Copy Link'; }, 2000);
+            });
+        }
+
+        function previewHTML() {
+            const htmlContent = document.getElementById('htmlInput').value.trim();
+            if (!htmlContent) {
+                showStatus('❌ Please paste some HTML first', 'error');
+                return;
+            }
+            const previewWindow = window.open();
+            previewWindow.document.write(htmlContent);
+            previewWindow.document.close();
+        }
+
+        function showStatus(message, type) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = 'status ' + type;
+        }
+
+        const path = window.location.pathname;
+        const match = path.match(/\/view\/([A-Z0-9]+)/);
+        if (match) {
+            const hash = match[1];
+            const stored = localStorage.getItem(hash);
+            if (stored) {
+                const newWindow = window.open();
+                newWindow.document.write(stored);
+                newWindow.document.close();
+            }
+        }
+    </script>
+</body>
+</html>
