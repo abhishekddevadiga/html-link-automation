@@ -46,6 +46,7 @@
     </style>
 </head>
 <body>
+
 <div class="container">
     <h1>HTML File Uploader</h1>
     <p class="subtitle">Upload an HTML file and get a shareable link instantly</p>
@@ -88,16 +89,42 @@
     let fileContent = '';
     let fileName = '';
 
-    async function supabase(method, path, body) {
-        const res = await fetch(SUPABASE_URL + '/rest/v1/' + path, {
-            method,
+    // ── VIEW MODE: if URL is /view/slug, fetch and render immediately ──
+    const viewPath = window.location.pathname;
+    if (viewPath.startsWith('/view/')) {
+        const slug = viewPath.replace('/view/', '').replace(/\/$/, '');
+        fetch(SUPABASE_URL + '/rest/v1/html_pages?slug=eq.' + encodeURIComponent(slug) + '&select=html', {
+            headers: {
+                'apikey': SUPABASE_KEY,
+                'Authorization': 'Bearer ' + SUPABASE_KEY
+            }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data && data.length > 0 && data[0].html) {
+                document.open();
+                document.write(data[0].html);
+                document.close();
+            } else {
+                document.body.innerHTML = '<div style="font-family:sans-serif;padding:60px;text-align:center"><h2>Page not found</h2><p style="color:#888;margin-top:8px">This link does not exist.</p><a href="/" style="color:#5c6ac4">Go back</a></div>';
+            }
+        })
+        .catch(() => {
+            document.body.innerHTML = '<div style="font-family:sans-serif;padding:60px;text-align:center"><h2>Error loading page</h2><p style="color:#888;margin-top:8px">Something went wrong.</p><a href="/" style="color:#5c6ac4">Go back</a></div>';
+        });
+    }
+
+    // ── UPLOADER FUNCTIONS ──
+    async function supabasePost(body) {
+        const res = await fetch(SUPABASE_URL + '/rest/v1/html_pages', {
+            method: 'POST',
             headers: {
                 'apikey': SUPABASE_KEY,
                 'Authorization': 'Bearer ' + SUPABASE_KEY,
                 'Content-Type': 'application/json',
-                'Prefer': method === 'POST' ? 'return=representation' : ''
+                'Prefer': 'return=representation'
             },
-            body: body ? JSON.stringify(body) : undefined
+            body: JSON.stringify(body)
         });
         return res.json();
     }
@@ -140,20 +167,15 @@
         setLoading(true);
 
         const nameInput = document.getElementById('customName').value.trim();
-        // Always generate a unique slug — append random suffix to avoid collisions
         const base = nameInput || fileName.replace(/\.html?$/i, '').replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
         const slug = base + '-' + Math.random().toString(36).substring(2, 7);
 
-        const data = await supabase('POST', 'html_pages', {
-            slug,
-            name: fileName,
-            html: fileContent
-        });
+        const data = await supabasePost({ slug, name: fileName, html: fileContent });
 
         setLoading(false);
 
-        if (data.error || (Array.isArray(data) && data[0]?.code)) {
-            showError('Upload failed: ' + (data.message || data[0]?.message || 'Unknown error'));
+        if (!data || data.error || (Array.isArray(data) && data[0]?.code)) {
+            showError('Upload failed: ' + (data?.message || (Array.isArray(data) && data[0]?.message) || 'Unknown error'));
             return;
         }
 
@@ -162,13 +184,11 @@
         document.getElementById('result').classList.add('show');
         document.getElementById('error').classList.remove('show');
 
-        // Save to local history for display
         const hist = JSON.parse(localStorage.getItem('upload_history') || '[]');
         hist.unshift({ slug, name: fileName, link });
         localStorage.setItem('upload_history', JSON.stringify(hist.slice(0, 10)));
         renderHistory();
 
-        // Reset for next upload
         document.getElementById('customName').value = '';
         document.getElementById('fileInput').value = '';
         document.getElementById('fileName').textContent = 'No file selected';
@@ -200,25 +220,6 @@
     }
 
     renderHistory();
-
-    // Handle /view/:slug — fetch from Supabase and render
-    const match = window.location.pathname.match(/\/view\/([^/]+)/);
-    if (match) {
-        const slug = match[1];
-        fetch(SUPABASE_URL + '/rest/v1/html_pages?slug=eq.' + slug + '&select=html', {
-            headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data && data[0] && data[0].html) {
-                document.open();
-                document.write(data[0].html);
-                document.close();
-            } else {
-                document.body.innerHTML = '<div style="font-family:sans-serif;padding:60px;text-align:center"><h2>Page not found</h2><p style="color:#888;margin-top:8px">This link does not exist.</p><a href="/" style="color:#5c6ac4">Go back</a></div>';
-            }
-        });
-    }
 </script>
 </body>
 </html>
